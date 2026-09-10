@@ -4835,6 +4835,27 @@ describe('organization default Plugin takeover', () => {
 });
 
 describe('market detail 响应身份绑定', () => {
+  it.each([[true, false], [false, true]])(
+    'allows detail and manual installation when defaultInstall changes from %s to %s',
+    async (listedDefaultInstall, detailDefaultInstall) => {
+      const item = organizationDefaultSummary({ defaultInstall: listedDefaultInstall });
+      const h = harness([item]);
+      h.api.detail.mockImplementation(async () => detail({ ...item, defaultInstall: detailDefaultInstall }));
+      const installDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-market-policy-drift-'));
+      roots.push(installDir);
+      const installedManifest = manifest(item.ghostId);
+      fs.writeFileSync(path.join(installDir, 'ghost.json'), JSON.stringify(installedManifest));
+      runtime.install.mockResolvedValue({ manifest: installedManifest, dir: installDir, enabled: true });
+
+      await expect(h.service.detail(item.id)).resolves.toMatchObject({ defaultInstall: detailDefaultInstall });
+      expect(h.api.download).not.toHaveBeenCalled();
+      await expect(h.service.install(item.id, reviewedInstallOptions(item)))
+        .resolves.toMatchObject({ ghost: { manifest: { id: item.ghostId } } });
+      expect(h.api.download).toHaveBeenCalledTimes(1);
+      expect(runtime.install).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('rejects a detail response that changes the default-install policy', async () => {
     const item = organizationDefaultSummary();
     const h = harness([item]);

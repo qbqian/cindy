@@ -208,7 +208,7 @@ function recordFrom(
   };
 }
 
-/** 列表与详情是两次请求；安装前必须确认两次看到的是同一份发布。 */
+/** 列表与详情必须指向同一发布；defaultInstall 是动态资格，由自动安装路径单独复核。 */
 function assertDetailMatchesSummary(
   summary: VisiblePluginSummary,
   detail: VisiblePluginDetail,
@@ -218,7 +218,6 @@ function assertDetailMatchesSummary(
     detail.ghostId !== summary.ghostId ||
     detail.scope !== summary.scope ||
     detail.organizationId !== summary.organizationId ||
-    detail.defaultInstall !== summary.defaultInstall ||
     detail.currentRelease.id !== summary.currentRelease.id ||
     detail.currentRelease.version !== summary.currentRelease.version ||
     detail.currentRelease.sha256 !== summary.currentRelease.sha256 ||
@@ -2617,6 +2616,8 @@ export class PluginMarketService {
             const detail = await this.api.detail(summary.id);
             requireSameMarketOwner(owner);
             assertDetailMatchesSummary(summary, detail);
+            // 部门查询失败或资格取消时跳过首次自动安装，不影响详情与用户主动安装。
+            if (!detail.defaultInstall) return;
             // 装完即开语义已收敛进市场安装入口本身,这里无需再显式声明。
             await this.installDetail(
               detail,
